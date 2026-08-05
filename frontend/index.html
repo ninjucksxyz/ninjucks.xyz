@@ -552,10 +552,11 @@ async function evmBroadcast({ cfg, execMsg, amount, offerDenom }) {
   const account = S.BaseAccount.fromRestApi(await new S.ChainRestAuthApi(cfg.rest).fetchAccount(wallet.address));
   const latest = await new S.ChainRestTendermintApi(cfg.rest).fetchLatestBlock();
   const timeoutHeight = (BigInt(latest.header.height) + 90n).toString();
-  // EIP-712 type-mapping rejects null fields, so default `recipient` (null = caller) to the
-  // wallet's own inj address — identical behavior for a direct swap, no null in the typed data.
+  // Use MsgExecuteContractCompat (not MsgExecuteContract): it carries the wasm `msg` as a JSON
+  // string, so EIP-712 types it as `string`. Plain MsgExecuteContract types it as `uint8[]` while
+  // the signed value is an object, which Injective's ante handler rejects on verification.
   const swapMsg = execMsg && execMsg.swap ? { swap: { ...execMsg.swap, recipient: execMsg.swap.recipient ?? wallet.address } } : execMsg;
-  const msg = S.MsgExecuteContract.fromJSON({ sender: wallet.address, contractAddress: cfg.contract, msg: swapMsg, funds: [{ denom: offerDenom, amount }] });
+  const msg = S.MsgExecuteContractCompat.fromJSON({ sender: wallet.address, contractAddress: cfg.contract, msg: swapMsg, funds: [{ denom: offerDenom, amount }] });
   const tx = { accountNumber: account.accountNumber.toString(), sequence: account.sequence.toString(), timeoutHeight, chainId: cfg.chainId, memo: "ninjucks swap" };
   setStatus('<span class="spin"></span>Building transaction…');
   const eip712 = S.getEip712TypedData({ msgs: msg, tx, fee: FEE, ethereumChainId: cfg.evmChainId });
