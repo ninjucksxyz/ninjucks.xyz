@@ -42,6 +42,16 @@
   .note.gov{background:#1e1704;border:1px solid #4d3c0a;color:var(--warn)}
   .note a{color:inherit;font-weight:600}
 
+  .pbanner{display:flex;align-items:center;gap:9px;text-decoration:none;
+    background:linear-gradient(135deg,#12233f,#0f2b2a);border:1px solid #24506b;
+    border-radius:12px;padding:9px 13px;margin-bottom:14px;font-size:12.5px;line-height:1.4;color:#cfe4ff}
+  .pbanner:hover{border-color:#2f6f8f}
+  .pbanner .dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);flex:0 0 auto;
+    animation:pulse 2s infinite}
+  .pbanner .go{color:var(--accent2);font-weight:700;white-space:nowrap}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(56,224,200,.5)}
+    70%{box-shadow:0 0 0 6px rgba(56,224,200,0)}100%{box-shadow:0 0 0 0 rgba(56,224,200,0)}}
+
   .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);
     border-radius:var(--radius);padding:8px;box-shadow:0 24px 60px -30px #000}
   .leg{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:6px}
@@ -109,6 +119,10 @@
 </head>
 <body>
 <div class="wrap">
+  <a class="pbanner" href="https://hub.injective.network/proposals/680" target="_blank" rel="noopener">
+    <span class="dot"></span>
+    <span><strong>Proposal&nbsp;#680 is live for a governance vote</strong> — help deploy Ninjucks on mainnet. <span class="go">Vote&nbsp;→</span></span>
+  </a>
   <header>
     <h1>Ninjucks</h1>
     <span class="chip">INJECTIVE</span>
@@ -121,8 +135,8 @@
   </div>
 
   <div class="note gov" id="govNote" style="display:none">
-    Mainnet contract is pending a governance deployment proposal.
-    <a id="govLink" href="#" target="_blank" rel="noopener">Track the proposal →</a>
+    Mainnet deployment is up for a governance vote — Proposal #680.
+    <a id="govLink" href="#" target="_blank" rel="noopener">Vote / track the proposal →</a>
   </div>
   <div class="note demo" id="demoNote">
     Testnet — quotes the live orderbook and sends a real on-chain transaction through the
@@ -204,7 +218,7 @@ const NETS = {
     indexer: "https://sentry.exchange.grpc-web.injective.network",
     explorer: "https://explorer.injective.network/transaction/",
     contract: "", markets: [], live: false,
-    govUrl: "https://hub.injective.network/proposals/",
+    govUrl: "https://hub.injective.network/proposals/680",
   },
 };
 
