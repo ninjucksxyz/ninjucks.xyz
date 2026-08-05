@@ -30,7 +30,17 @@
     filter:drop-shadow(0 6px 20px rgba(56,224,200,.22));padding-right:4px}
   .chip{font-size:10.5px;color:var(--accent2);border:1px solid #23413f;background:#0d1c1b;
     padding:3px 8px;border-radius:20px;font-weight:600;letter-spacing:.4px;margin-bottom:12px;white-space:nowrap}
-  .tag{color:var(--muted);font-size:13px;margin:6px 0 20px}
+  .tag{color:var(--muted);font-size:13px;margin:6px 0 18px}
+
+  .nav{display:flex;gap:2px;margin:0 0 16px;border-bottom:1px solid var(--line)}
+  .nav button{background:transparent;border:0;color:var(--muted);font:inherit;font-weight:700;
+    font-size:14.5px;padding:8px 13px 11px;cursor:pointer;position:relative;display:flex;align-items:center;gap:7px}
+  .nav button.on{color:var(--text)}
+  .nav button.on::after{content:"";position:absolute;left:13px;right:13px;bottom:-1px;height:2px;
+    border-radius:2px 2px 0 0;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .nav button:disabled{cursor:not-allowed;color:#57657e}
+  .nav .soon{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--accent2);
+    border:1px solid #23413f;background:#0d1c1b;border-radius:6px;padding:2px 5px}
 
   .seg{display:flex;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:14px}
   .seg button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;
@@ -128,6 +138,11 @@
     <span class="chip">INJECTIVE</span>
   </header>
   <p class="tag">Swap across Injective liquidity — one interface, best execution.</p>
+
+  <nav class="nav" id="nav">
+    <button data-view="swap" class="on">Swap</button>
+    <button data-view="lend" disabled title="Lending &amp; borrowing — coming soon">Lend / Borrow <span class="soon">SOON</span></button>
+  </nav>
 
   <div class="seg" id="seg">
     <button data-net="testnet" class="on">Testnet</button>
