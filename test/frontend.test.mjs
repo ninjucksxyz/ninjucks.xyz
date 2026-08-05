@@ -28,7 +28,7 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const URL = `http://127.0.0.1:${server.address().port}/`;
 const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
 
-async function freshPage({ withKeplr = false, withHook = false, balances = { inj: "5000000000000000000" }, book = BOOK } = {}) {
+async function freshPage({ withKeplr = false, withHook = false, withEvm = false, balances = { inj: "5000000000000000000" }, book = BOOK } = {}) {
   const page = await browser.newPage();
   await page.evaluateOnNewDocument((flags) => {
     window.__calls = [];
@@ -36,6 +36,14 @@ async function freshPage({ withKeplr = false, withHook = false, balances = { inj
       enable: async () => {}, getKey: async () => ({ bech32Address: "inj1testxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", pubKey: new Uint8Array([1, 2, 3]) }),
       signDirect: async () => ({ signed: { bodyBytes: new Uint8Array(), authInfoBytes: new Uint8Array() }, signature: { signature: btoa("sig") } }),
     };
+    if (flags.withEvm) {
+      // mock an EVM wallet (MetaMask) announced over EIP-6963, and stub the inj-address derivation
+      window.__NINJUCKS_TEST_INJADDR = (eth) => "inj1" + eth.slice(2, 12).toLowerCase() + "evmxxxxxxxxxxxxxxxxxx";
+      const provider = { isMetaMask: true, request: async ({ method }) => (method === "eth_requestAccounts" ? ["0xAf79152AC5dF276D9A8e1E2E22822f9713474902"] : null) };
+      window.ethereum = provider;
+      window.addEventListener("eip6963:requestProvider", () =>
+        window.dispatchEvent(new CustomEvent("eip6963:announceProvider", { detail: { info: { rdns: "io.metamask", name: "MetaMask" }, provider } })));
+    }
     if (flags.withHook) window.__NINJUCKS_TEST_BROADCAST = async (a) => { window.__calls.push(a); return "MOCKHASH0123456789"; };
     const _fetch = window.fetch.bind(window);
     window.fetch = async (url, opt) => {
@@ -44,7 +52,7 @@ async function freshPage({ withKeplr = false, withHook = false, balances = { inj
       if (u.includes("/api/exchange/spot/v2/orderbook/")) return { ok: true, json: async () => ({ orderbook: flags.book }) };
       return _fetch(url, opt);
     };
-  }, { withKeplr, withHook, balances, book });
+  }, { withKeplr, withHook, withEvm, balances, book });
   const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(URL, { waitUntil: "networkidle0" });
   page.__errors = errors;
@@ -54,7 +62,7 @@ const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
 const val = (page, sel) => page.$eval(sel, (e) => e.value);
 const btnText = (page) => text(page, "#swapBtn");
 const waitQuote = (page) => page.waitForFunction(() => window.__ninjucks.quote !== null, { timeout: 5000 });
-async function connect(page) { await page.click("#swapBtn"); await page.waitForFunction(() => window.__ninjucks.wallet !== null, { timeout: 5000 }); }
+async function connect(page) { await page.evaluate(() => window.__ninjucks.connect("keplr")); await page.waitForFunction(() => window.__ninjucks.wallet !== null, { timeout: 5000 }); }
 
 try {
   // 1. Loads; INJ/USDC icons; default INJ->USDC.
@@ -180,9 +188,36 @@ try {
   // 10. No Keplr → clear error.
   {
     const page = await freshPage({ withKeplr: false });
-    await page.click("#swapBtn");
+    await page.evaluate(() => window.__ninjucks.connect("keplr"));
     await page.waitForFunction(() => document.querySelector("#status")?.classList.contains("err"), { timeout: 5000 });
     ok("no-keplr surfaces error", (await text(page, "#status")).toLowerCase().includes("keplr not found"));
+    await page.close();
+  }
+
+  // 12. Wallet picker lists all four wallets; available vs install state.
+  {
+    const page = await freshPage({ withKeplr: true });
+    await page.evaluate(() => window.__ninjucks.openWalletModal());
+    const names = await page.$$eval("#wList .wrow", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()));
+    ok("picker lists 4 wallets", names.length === 4, names.join("|"));
+    ok("keplr available as Cosmos", names.some((n) => n.includes("Keplr") && n.includes("Cosmos")), names.join("|"));
+    ok("absent EVM wallet shows Install", names.some((n) => n.includes("MetaMask") && n.includes("Install")), names.join("|"));
+    await page.close();
+  }
+
+  // 13. EVM wallet (MetaMask via EIP-6963) connects → injective address.
+  {
+    const page = await freshPage({ withEvm: true });
+    await page.evaluate(() => window.__ninjucks.connect("metamask"));
+    await page.waitForFunction(() => window.__ninjucks.wallet !== null, { timeout: 6000 });
+    const w = await page.evaluate(() => ({ type: window.__ninjucks.wallet.type, addr: window.__ninjucks.wallet.address, name: window.__ninjucks.wallet.name }));
+    ok("metamask connects as evm", w.type === "evm", w.type);
+    ok("evm maps to inj address", w.addr.startsWith("inj1"), w.addr);
+    ok("wallet name is MetaMask", w.name === "MetaMask", w.name);
+    // picker now marks MetaMask available (EVM)
+    await page.evaluate(() => window.__ninjucks.openWalletModal());
+    const mm = await page.$$eval("#wList .wrow", (els) => els.map((e) => e.textContent.replace(/\s+/g, " ").trim()).find((n) => n.includes("MetaMask")));
+    ok("connected EVM wallet shows EVM tag", mm.includes("EVM"), mm);
     await page.close();
   }
 

@@ -120,6 +120,25 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   .acct{font-size:11.5px;color:#5b6a82;margin:4px 6px 0;text-align:right}
 
+  .wmodal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center}
+  .wmodal[hidden]{display:none}
+  .wback{position:absolute;inset:0;background:rgba(4,7,12,.66);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+  .wsheet{position:relative;width:min(360px,92vw);background:linear-gradient(180deg,var(--card),var(--card2));
+    border:1px solid var(--line2);border-radius:16px;padding:14px;box-shadow:0 30px 80px -30px #000}
+  .whead{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin:2px 4px 12px}
+  .wx{background:transparent;border:0;color:var(--muted);font-size:15px;cursor:pointer;line-height:1}
+  .wlist{display:flex;flex-direction:column;gap:7px}
+  .wrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;text-decoration:none;
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;
+    color:var(--text);font:inherit;font-weight:600;transition:.15s}
+  .wrow:hover{border-color:var(--line2);background:#131c28}
+  .wrow.off{opacity:.55}
+  .wbadge{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:800;font-size:13px}
+  .wname{flex:1}
+  .wtag{font-size:10.5px;font-weight:700;color:var(--muted);border:1px solid var(--line2);border-radius:6px;padding:2px 6px}
+  .wnote{color:var(--muted);font-size:11px;line-height:1.45;margin:12px 4px 2px}
+
   details.dev{margin-top:16px}
   details.dev summary{color:#4c5a70;font-size:12px;cursor:pointer}
   pre{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px;
@@ -196,9 +215,18 @@
       <div>Min received <span class="minrec" id="minRec">—</span></div>
     </div>
 
-    <button class="cta" id="swapBtn">Connect Keplr</button>
+    <button class="cta" id="swapBtn">Connect wallet</button>
     <div class="status" id="status"></div>
     <div class="acct" id="acct"></div>
+  </div>
+
+  <div class="wmodal" id="walletModal" hidden>
+    <div class="wback" id="wBack"></div>
+    <div class="wsheet">
+      <div class="whead"><span>Connect a wallet</span><button class="wx" id="wClose" aria-label="Close">✕</button></div>
+      <div id="wList" class="wlist"></div>
+      <p class="wnote">Cosmos &amp; EVM wallets — an EVM wallet signs via EIP-712 and maps to its Injective account.</p>
+    </div>
   </div>
 
   <details class="dev">
@@ -228,6 +256,7 @@ const tok = (sym) => TOKENS.find((t) => t.sym === sym) || TOKENS[0];
 const NETS = {
   testnet: {
     chainId: "injective-888",
+    evmChainId: 11155111,          // EIP-712 domain chain id (Sepolia) for injective-888
     rest: "https://testnet.sentry.lcd.injective.network",
     indexer: "https://testnet.sentry.exchange.grpc-web.injective.network",
     explorer: "https://testnet.explorer.injective.network/transaction/",
@@ -240,6 +269,7 @@ const NETS = {
   },
   mainnet: {
     chainId: "injective-1",
+    evmChainId: 1,                 // EIP-712 domain chain id (Ethereum mainnet) for injective-1
     rest: "https://sentry.lcd.injective.network",
     indexer: "https://sentry.exchange.grpc-web.injective.network",
     explorer: "https://explorer.injective.network/transaction/",
@@ -388,7 +418,7 @@ function refresh() {
     $("payBal").textContent = `Balance: ${fmt(fromBase(balOf(inTok().denom), inTok().dec))} ${inTok().sym}`;
     $("payBal").classList.add("max");
     $("recvBal").textContent = `Balance: ${fmt(fromBase(balOf(outTok().denom), outTok().dec))} ${outTok().sym}`;
-    $("acct").textContent = `${wallet.address.slice(0, 11)}…${wallet.address.slice(-5)}`;
+    $("acct").textContent = `${wallet.name} · ${wallet.address.slice(0, 11)}…${wallet.address.slice(-5)}`;
   } else {
     $("payBal").textContent = ""; $("recvBal").textContent = ""; $("acct").textContent = "";
     $("payBal").classList.remove("max");
@@ -396,7 +426,7 @@ function refresh() {
 
   const btn = $("swapBtn");
   if (!cfg.live) { btn.disabled = true; btn.textContent = "Awaiting governance deployment"; }
-  else if (!wallet) { btn.disabled = false; btn.textContent = "Connect Keplr"; }
+  else if (!wallet) { btn.disabled = false; btn.textContent = "Connect wallet"; }
   else {
     const amt = toBase($("amount").value, inTok().dec), bal = balOf(inTok().denom);
     if (BigInt(amt) === 0n) { btn.disabled = true; btn.textContent = "Enter an amount"; }
@@ -418,19 +448,83 @@ function setNet(n) {
   refresh(); scheduleQuote();
 }
 
-async function connect() {
+// ---- Multi-wallet: Keplr (Cosmos-native) + MetaMask / Rabby / Brave (EVM, EIP-712) ----
+const WALLETS = {
+  keplr:    { name: "Keplr",    kind: "cosmos", color: "#7b5cff", mono: "K", rdns: null,               url: "https://www.keplr.app/download" },
+  metamask: { name: "MetaMask", kind: "evm",    color: "#f6851b", mono: "M", rdns: "io.metamask",      url: "https://metamask.io/download" },
+  rabby:    { name: "Rabby",    kind: "evm",    color: "#7084ff", mono: "R", rdns: "io.rabby",         url: "https://rabby.io" },
+  brave:    { name: "Brave",    kind: "evm",    color: "#fb542b", mono: "B", rdns: "com.brave.wallet", url: "https://brave.com/wallet" },
+};
+// EIP-6963: collect announced EVM providers (keyed by rdns).
+const evmProviders = new Map();
+window.addEventListener("eip6963:announceProvider", (e) => {
+  const d = e.detail || {};
+  if (d.info && d.info.rdns) evmProviders.set(d.info.rdns, d.provider);
+});
+try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (_) {}
+
+// Resolve the injected provider for an EVM wallet: EIP-6963 first, then window.ethereum flags.
+function evmProviderFor(id) {
+  const w = WALLETS[id];
+  if (evmProviders.has(w.rdns)) return evmProviders.get(w.rdns);
+  const eth = window.ethereum;
+  if (!eth) return null;
+  const flag = { metamask: "isMetaMask", rabby: "isRabby", brave: "isBraveWallet" }[id];
+  const list = eth.providers && eth.providers.length ? eth.providers : [eth];
+  return list.find((p) => p && p[flag]) || (eth[flag] ? eth : null);
+}
+function walletAvailable(id) {
+  return WALLETS[id].kind === "cosmos" ? !!window.keplr : !!evmProviderFor(id);
+}
+
+async function connectWallet(id) {
   const cfg = NETS[net];
-  if (!window.keplr) throw new Error("Keplr not found — install the Keplr extension.");
-  setStatus('<span class="spin"></span>Connecting Keplr…');
-  await window.keplr.enable(cfg.chainId);
-  const key = await window.keplr.getKey(cfg.chainId);
-  let balances = {};
-  try { balances = await fetchBalances(cfg.rest, key.bech32Address); }
-  catch (_) { setStatus("Connected — couldn't load balances (RPC).", "err"); }
-  wallet = { address: key.bech32Address, pubKey: key.pubKey, balances };
-  if (!$("status").classList.contains("err")) setStatus("");
+  const w = WALLETS[id];
+  closeWalletModal();
+  try {
+    if (w.kind === "cosmos") {
+      if (!window.keplr) throw new Error("Keplr not found — install the Keplr extension.");
+      setStatus('<span class="spin"></span>Connecting Keplr…');
+      await window.keplr.enable(cfg.chainId);
+      const key = await window.keplr.getKey(cfg.chainId);
+      let balances = {};
+      try { balances = await fetchBalances(cfg.rest, key.bech32Address); }
+      catch (_) { setStatus("Connected — couldn't load balances (RPC).", "err"); }
+      wallet = { type: "keplr", name: w.name, address: key.bech32Address, pubKey: key.pubKey, balances };
+    } else {
+      const provider = evmProviderFor(id);
+      if (!provider) throw new Error(`${w.name} not found — install the ${w.name} extension.`);
+      setStatus(`<span class="spin"></span>Connecting ${w.name}…`);
+      const accounts = await provider.request({ method: "eth_requestAccounts" });
+      const eth = accounts[0];
+      // EVM address maps to an Injective account (both ethsecp256k1).
+      const inj = window.__NINJUCKS_TEST_INJADDR ? window.__NINJUCKS_TEST_INJADDR(eth) : (await import(SDK)).getInjectiveAddress(eth);
+      let balances = {};
+      try { balances = await fetchBalances(cfg.rest, inj); }
+      catch (_) { setStatus("Connected — couldn't load balances (RPC).", "err"); }
+      wallet = { type: "evm", name: w.name, address: inj, ethAddress: eth, provider, balances };
+    }
+    if (!$("status").classList.contains("err")) setStatus("");
+  } catch (e) { setStatus("⚠️ " + (e?.message || e), "err"); }
   refresh();
 }
+
+function openWalletModal() {
+  const list = $("wList"); list.innerHTML = "";
+  for (const id of Object.keys(WALLETS)) {
+    const w = WALLETS[id], ok = walletAvailable(id);
+    const row = document.createElement(ok ? "button" : "a");
+    row.className = "wrow" + (ok ? "" : " off");
+    if (!ok) { row.href = w.url; row.target = "_blank"; row.rel = "noopener"; }
+    row.innerHTML = `<span class="wbadge" style="background:${w.color}">${w.mono}</span>` +
+      `<span class="wname">${w.name}</span>` +
+      `<span class="wtag">${ok ? (w.kind === "evm" ? "EVM" : "Cosmos") : "Install ↗"}</span>`;
+    if (ok) row.addEventListener("click", () => connectWallet(id));
+    list.appendChild(row);
+  }
+  $("walletModal").hidden = false;
+}
+function closeWalletModal() { const m = $("walletModal"); if (m) m.hidden = true; }
 
 async function realBroadcast({ cfg, execMsg, amount, offerDenom }) {
   const { MsgExecuteContract, ChainRestAuthApi, createTransaction, TxRestApi, BaseAccount } = await import(SDK);
@@ -450,17 +544,45 @@ async function realBroadcast({ cfg, execMsg, amount, offerDenom }) {
   return hash;
 }
 
+// EVM wallets (MetaMask / Rabby / Brave) sign the tx as EIP-712 typed data; Injective's ante
+// handler verifies it against the ethsecp256k1 key that the pubkey is recovered from.
+async function evmBroadcast({ cfg, execMsg, amount, offerDenom }) {
+  const S = await import(SDK);
+  setStatus('<span class="spin"></span>Fetching account…');
+  const account = S.BaseAccount.fromRestApi(await new S.ChainRestAuthApi(cfg.rest).fetchAccount(wallet.address));
+  const latest = await new S.ChainRestTendermintApi(cfg.rest).fetchLatestBlock();
+  const timeoutHeight = (BigInt(latest.header.height) + 90n).toString();
+  // EIP-712 type-mapping rejects null fields, so default `recipient` (null = caller) to the
+  // wallet's own inj address — identical behavior for a direct swap, no null in the typed data.
+  const swapMsg = execMsg && execMsg.swap ? { swap: { ...execMsg.swap, recipient: execMsg.swap.recipient ?? wallet.address } } : execMsg;
+  const msg = S.MsgExecuteContract.fromJSON({ sender: wallet.address, contractAddress: cfg.contract, msg: swapMsg, funds: [{ denom: offerDenom, amount }] });
+  const tx = { accountNumber: account.accountNumber.toString(), sequence: account.sequence.toString(), timeoutHeight, chainId: cfg.chainId, memo: "ninjucks swap" };
+  setStatus('<span class="spin"></span>Building transaction…');
+  const eip712 = S.getEip712TypedData({ msgs: msg, tx, fee: FEE, ethereumChainId: cfg.evmChainId });
+  setStatus('<span class="spin"></span>Awaiting signature…');
+  const signature = await wallet.provider.request({ method: "eth_signTypedData_v4", params: [wallet.ethAddress, JSON.stringify(eip712)] });
+  const pubKey = S.hexToBase64(S.recoverTypedSignaturePubKey(eip712, signature).replace(/^0x/, ""));
+  const { txRaw } = S.createTransaction({ message: msg, memo: "ninjucks swap", fee: FEE, pubKey, sequence: account.sequence, accountNumber: account.accountNumber, chainId: cfg.chainId, signMode: S.SIGN_EIP712, timeoutHeight: Number(timeoutHeight) });
+  const txRawEip712 = S.createTxRawEIP712(txRaw, S.createWeb3Extension({ ethereumChainId: cfg.evmChainId }));
+  txRawEip712.signatures = [Uint8Array.from(signature.replace(/^0x/, "").match(/.{2}/g).map((h) => parseInt(h, 16)))];
+  setStatus('<span class="spin"></span>Broadcasting…');
+  const res = await new S.TxRestApi(cfg.rest).broadcast(txRawEip712);
+  const hash = res.txHash || res.txhash;
+  if (res.code && res.code !== 0) throw new Error(res.rawLog || ("code " + res.code));
+  return hash;
+}
+
 async function onSwap() {
   const cfg = NETS[net];
   if (!cfg.live) return;
   $("swapBtn").disabled = true;
   try {
-    if (!wallet) { await connect(); return; }
+    if (!wallet) { openWalletModal(); return; }
     const amount = toBase($("amount").value, inTok().dec);
     if (BigInt(amount) > BigInt(balOf(inTok().denom))) throw new Error(`Insufficient ${inTok().sym} balance.`);
     if (!quote || quote.expected === 0n) throw new Error("No live quote.");
     const execMsg = buildExecuteMsg();
-    const send = window.__NINJUCKS_TEST_BROADCAST || realBroadcast;
+    const send = window.__NINJUCKS_TEST_BROADCAST || (wallet.type === "evm" ? evmBroadcast : realBroadcast);
     const hash = await send({ cfg, execMsg, amount, offerDenom: inTok().denom });
     setStatus(`✅ Swap sent — <a href="${cfg.explorer}${hash}" target="_blank" rel="noopener">${String(hash).slice(0,14)}…</a>`, "ok");
     try { wallet.balances = await fetchBalances(cfg.rest, wallet.address); } catch (_) {}
@@ -497,7 +619,10 @@ function runQuoteSlip() {
 initTokens();
 setNet("testnet");
 
-window.__ninjucks = { buildExecuteMsg, setNet, refresh, walkQuote, get wallet() { return wallet; }, get quote() { return quote; }, setQuote(q) { quote = q; refresh(); } };
+$("wClose").addEventListener("click", closeWalletModal);
+$("wBack").addEventListener("click", closeWalletModal);
+
+window.__ninjucks = { buildExecuteMsg, setNet, refresh, walkQuote, connect: connectWallet, openWalletModal, walletAvailable, get wallet() { return wallet; }, get quote() { return quote; }, setQuote(q) { quote = q; refresh(); } };
 </script>
 </body>
 </html>
