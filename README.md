@@ -12,8 +12,7 @@ If the swap can't meet your minimum, the whole transaction reverts.
 ## Features
 
 - **One message, many venues** — stop special-casing each router's schema.
-- **Non-custodial & atomic** — funds are never parked in the contract; every swap fully settles or
-  reverts.
+- **Atomic** — funds are never parked in the contract; every swap fully settles or reverts.
 - **Slippage-safe** — a `minimum_receive` floor is enforced by the aggregator itself.
 
 ## Interface
