@@ -1,0 +1,17 @@
+{
+  "name": "build",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@injectivelabs/sdk-ts": "^1.14.48",
+    "esbuild": "^0.28.1",
+    "esbuild-plugin-polyfill-node": "^0.3.0"
+  }
+}

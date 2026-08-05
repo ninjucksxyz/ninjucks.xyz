@@ -1,0 +1,63 @@
+name: Test & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Contract tests
+        run: cargo test --locked
+      - name: Expected hash (committed)
+        run: echo "EXPECTED=$(awk '$2=="ninjucks.wasm"{print $1}' artifacts/checksums.txt)" >> "$GITHUB_ENV"
+      - name: Reproducible build (cosmwasm/optimizer)
+        run: |
+          docker run --rm -v "$PWD":/code \
+            --mount type=volume,source=nj_cache,target=/target \
+            --mount type=volume,source=nj_registry,target=/usr/local/cargo/registry \
+            cosmwasm/optimizer:0.17.0
+      - name: Verify reproducible hash matches source
+        run: |
+          ACTUAL=$(awk '$2=="ninjucks.wasm"{print $1}' artifacts/checksums.txt)
+          echo "expected=$EXPECTED"; echo "actual  =$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED" || { echo "::error::reproducible hash mismatch"; exit 1; }
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install test deps
+        working-directory: test
+        run: npm install
+      - name: Frontend tests (Puppeteer)
+        run: node test/frontend.test.mjs
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build SDK bundle
+        working-directory: build
+        run: npm ci && node build.mjs
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy frontend --project-name=ninjucks --branch=main

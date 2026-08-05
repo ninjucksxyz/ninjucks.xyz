@@ -1,0 +1,9 @@
+# Reproducible build — cosmwasm/optimizer:0.17.0 with the committed Cargo.lock.
+# Reproduce:  docker run --rm -v "$PWD":/code \
+#               --mount type=volume,source=nj_cache,target=/target \
+#               --mount type=volume,source=nj_registry,target=/usr/local/cargo/registry \
+#               cosmwasm/optimizer:0.17.0
+# The resulting artifacts/ninjucks.wasm must have this SHA256, which must equal the
+# on-chain code data_hash after the store proposal.
+
+0c983abbc0373b28d4a7aa5a25fe059d36dc13604459a97c3a1ca1b01e888bb4  ninjucks.wasm

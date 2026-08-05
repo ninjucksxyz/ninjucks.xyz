@@ -1,0 +1,7 @@
+{
+  "name": "ninjucks-frontend-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node frontend.test.mjs" },
+  "devDependencies": { "puppeteer": "^23.0.0" }
+}
