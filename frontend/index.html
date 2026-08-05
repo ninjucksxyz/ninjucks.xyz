@@ -138,6 +138,17 @@
   .wtag{font-size:10.5px;font-weight:700;color:var(--muted);border:1px solid var(--line2);border-radius:6px;padding:2px 6px}
   .wnote{color:var(--muted);font-size:11px;line-height:1.45;margin:12px 4px 2px}
 
+  .tlist{margin:4px 2px 0;padding-left:18px;color:var(--muted);font-size:12px;line-height:1.5}
+  .tlist li{margin-bottom:8px}
+  .tcheck{display:flex;align-items:flex-start;gap:9px;margin:12px 2px 2px;font-size:12.5px;color:var(--text);cursor:pointer}
+  .tcheck input{margin-top:2px;accent-color:var(--accent2);width:15px;height:15px;flex:0 0 auto}
+  .tbtns{display:flex;gap:8px;margin-top:16px}
+  .tbtn{flex:1;border-radius:11px;padding:12px;font:inherit;font-weight:700;cursor:pointer;transition:.15s;border:1px solid var(--line2)}
+  .tbtn.ghost{background:transparent;color:var(--muted)}
+  .tbtn.ghost:hover{color:var(--text);border-color:var(--muted)}
+  .tbtn.primary{border:0;color:#04140f;background:linear-gradient(135deg,#5b9dff,var(--accent2))}
+  .tbtn.primary:disabled{opacity:.45;cursor:not-allowed}
+
   details.dev{margin-top:16px}
   details.dev summary{color:#4c5a70;font-size:12px;cursor:pointer}
   pre{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px;
@@ -225,6 +236,24 @@
       <div class="whead"><span>Connect a wallet</span><button class="wx" id="wClose" aria-label="Close">✕</button></div>
       <div id="wList" class="wlist"></div>
       <p class="wnote">Cosmos &amp; EVM wallets — an EVM wallet signs via EIP-712 and maps to its Injective account.</p>
+    </div>
+  </div>
+
+  <div class="wmodal" id="termsModal" hidden>
+    <div class="wback"></div>
+    <div class="wsheet">
+      <div class="whead"><span>Before you continue</span></div>
+      <ul class="tlist">
+        <li>Ninjucks is experimental, open-source software provided “as is”, with no warranties. You use it at your own risk.</li>
+        <li>You alone are responsible for your wallet, your keys, and every transaction you sign — transactions are final and irreversible.</li>
+        <li>Swapping tokens carries risk, including price slippage and loss of funds. Nothing here is financial, legal, or tax advice.</li>
+        <li>You are responsible for the laws that apply to you, and you confirm you are not a sanctioned or restricted person and are not accessing from a prohibited jurisdiction.</li>
+      </ul>
+      <label class="tcheck"><input type="checkbox" id="termsChk"/> <span>I have read and agree to the above.</span></label>
+      <div class="tbtns">
+        <button class="tbtn ghost" id="termsCancel">Cancel</button>
+        <button class="tbtn primary" id="termsOk" disabled>Agree &amp; continue</button>
+      </div>
     </div>
   </div>
 
@@ -506,7 +535,16 @@ async function connectWallet(id) {
     if (!$("status").classList.contains("err")) setStatus("");
   } catch (e) { setStatus("⚠️ " + (e?.message || e), "err"); }
   refresh();
+  if (wallet && !termsAccepted()) openTermsModal();
 }
+
+// One-time legal-terms confirmation, shown right after a wallet connects.
+const TERMS_KEY = "ninjucks_terms_v1";
+function termsAccepted() { try { return localStorage.getItem(TERMS_KEY) === "1"; } catch (_) { return false; } }
+function openTermsModal() { $("termsChk").checked = false; $("termsOk").disabled = true; $("termsModal").hidden = false; }
+function closeTermsModal() { $("termsModal").hidden = true; }
+function acceptTerms() { try { localStorage.setItem(TERMS_KEY, "1"); } catch (_) {} closeTermsModal(); refresh(); }
+function declineTerms() { closeTermsModal(); wallet = null; setStatus("Connect a wallet to swap."); refresh(); }
 
 function openWalletModal() {
   const list = $("wList"); list.innerHTML = "";
@@ -621,6 +659,9 @@ setNet("testnet");
 
 $("wClose").addEventListener("click", closeWalletModal);
 $("wBack").addEventListener("click", closeWalletModal);
+$("termsChk").addEventListener("change", () => { $("termsOk").disabled = !$("termsChk").checked; });
+$("termsOk").addEventListener("click", acceptTerms);
+$("termsCancel").addEventListener("click", declineTerms);
 
 window.__ninjucks = { buildExecuteMsg, setNet, refresh, walkQuote, connect: connectWallet, openWalletModal, walletAvailable, get wallet() { return wallet; }, get quote() { return quote; }, setQuote(q) { quote = q; refresh(); } };
 </script>

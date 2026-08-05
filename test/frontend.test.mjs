@@ -28,10 +28,11 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const URL = `http://127.0.0.1:${server.address().port}/`;
 const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
 
-async function freshPage({ withKeplr = false, withHook = false, withEvm = false, balances = { inj: "5000000000000000000" }, book = BOOK } = {}) {
+async function freshPage({ withKeplr = false, withHook = false, withEvm = false, acceptTerms = true, balances = { inj: "5000000000000000000" }, book = BOOK } = {}) {
   const page = await browser.newPage();
   await page.evaluateOnNewDocument((flags) => {
     window.__calls = [];
+    try { if (flags.acceptTerms !== false) localStorage.setItem("ninjucks_terms_v1", "1"); else localStorage.removeItem("ninjucks_terms_v1"); } catch (e) {}
     if (flags.withKeplr) window.keplr = {
       enable: async () => {}, getKey: async () => ({ bech32Address: "inj1testxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", pubKey: new Uint8Array([1, 2, 3]) }),
       signDirect: async () => ({ signed: { bodyBytes: new Uint8Array(), authInfoBytes: new Uint8Array() }, signature: { signature: btoa("sig") } }),
@@ -52,7 +53,7 @@ async function freshPage({ withKeplr = false, withHook = false, withEvm = false,
       if (u.includes("/api/exchange/spot/v2/orderbook/")) return { ok: true, json: async () => ({ orderbook: flags.book }) };
       return _fetch(url, opt);
     };
-  }, { withKeplr, withHook, withEvm, balances, book });
+  }, { withKeplr, withHook, withEvm, acceptTerms, balances, book });
   const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(URL, { waitUntil: "networkidle0" });
   page.__errors = errors;
@@ -227,6 +228,40 @@ try {
     await page.click('#seg button[data-net="mainnet"]');
     ok("mainnet: swap disabled", await page.$eval("#swapBtn", (e) => e.disabled));
     ok("mainnet: governance label", (await btnText(page)).toLowerCase().includes("governance"));
+    await page.close();
+  }
+
+  // 14. Legal terms modal gates right after connect; agree persists + dismisses.
+  {
+    const page = await freshPage({ withKeplr: true, acceptTerms: false });
+    await page.evaluate(() => window.__ninjucks.connect("keplr"));
+    await page.waitForFunction(() => !document.getElementById("termsModal").hidden, { timeout: 5000 });
+    ok("terms modal shows after connect", !(await page.$eval("#termsModal", (e) => e.hidden)));
+    ok("agree disabled until checkbox", await page.$eval("#termsOk", (e) => e.disabled));
+    await page.click("#termsChk");
+    ok("agree enabled after check", !(await page.$eval("#termsOk", (e) => e.disabled)));
+    await page.click("#termsOk");
+    ok("terms dismissed on agree", await page.$eval("#termsModal", (e) => e.hidden));
+    ok("acceptance persisted", (await page.evaluate(() => localStorage.getItem("ninjucks_terms_v1"))) === "1");
+    await page.close();
+  }
+
+  // 15. Declining terms disconnects the wallet.
+  {
+    const page = await freshPage({ withKeplr: true, acceptTerms: false });
+    await page.evaluate(() => window.__ninjucks.connect("keplr"));
+    await page.waitForFunction(() => !document.getElementById("termsModal").hidden, { timeout: 5000 });
+    await page.click("#termsCancel");
+    ok("decline hides terms modal", await page.$eval("#termsModal", (e) => e.hidden));
+    ok("decline disconnects wallet", (await page.evaluate(() => window.__ninjucks.wallet)) === null);
+    await page.close();
+  }
+
+  // 16. Accepted terms (seeded) → no modal on connect.
+  {
+    const page = await freshPage({ withKeplr: true });
+    await connect(page);
+    ok("no terms modal when already accepted", await page.$eval("#termsModal", (e) => e.hidden));
     await page.close();
   }
 } finally { await browser.close(); server.close(); }
