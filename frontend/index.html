@@ -32,13 +32,17 @@
     padding:3px 8px;border-radius:20px;font-weight:600;letter-spacing:.4px;margin-bottom:12px;white-space:nowrap}
   .tag{color:var(--muted);font-size:13px;margin:6px 0 18px}
 
-  .nav{display:flex;gap:2px;margin:0 0 16px;border-bottom:1px solid var(--line)}
+  .nav{display:flex;gap:2px;margin:0 0 16px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
   .nav button{background:transparent;border:0;color:var(--muted);font:inherit;font-weight:700;
-    font-size:14.5px;padding:8px 13px 11px;cursor:pointer;position:relative;display:flex;align-items:center;gap:7px}
+    font-size:14px;padding:8px 12px 11px;cursor:pointer;position:relative;display:flex;align-items:center;gap:6px;
+    white-space:nowrap;flex:0 0 auto}
   .nav button.on{color:var(--text)}
-  .nav button.on::after{content:"";position:absolute;left:13px;right:13px;bottom:-1px;height:2px;
+  .nav button.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;
     border-radius:2px 2px 0 0;background:linear-gradient(90deg,var(--accent),var(--accent2))}
   .nav button:disabled{cursor:not-allowed;color:#57657e}
+  .nav .cico{width:14px;height:14px;flex:0 0 auto;fill:var(--accent)}
+  .nav button:disabled .cico{fill:#46618f}
   .nav .soon{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--accent2);
     border:1px solid #23413f;background:#0d1c1b;border-radius:6px;padding:2px 5px}
 
@@ -142,6 +146,7 @@
   <nav class="nav" id="nav">
     <button data-view="swap" class="on">Swap</button>
     <button data-view="lend" disabled title="Lending &amp; borrowing — coming soon">Lend / Borrow <span class="soon">SOON</span></button>
+    <button data-view="xswap" disabled title="Cross-chain swaps with Cardano — coming soon"><svg class="cico" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50.0" cy="50.0" r="4.2"/><circle cx="67.0" cy="50.0" r="3.6"/><circle cx="58.5" cy="64.7" r="3.6"/><circle cx="41.5" cy="64.7" r="3.6"/><circle cx="33.0" cy="50.0" r="3.6"/><circle cx="41.5" cy="35.3" r="3.6"/><circle cx="58.5" cy="35.3" r="3.6"/><circle cx="80.9" cy="58.3" r="2.6"/><circle cx="72.6" cy="72.6" r="2.6"/><circle cx="58.3" cy="80.9" r="2.6"/><circle cx="41.7" cy="80.9" r="2.6"/><circle cx="27.4" cy="72.6" r="2.6"/><circle cx="19.1" cy="58.3" r="2.6"/><circle cx="19.1" cy="41.7" r="2.6"/><circle cx="27.4" cy="27.4" r="2.6"/><circle cx="41.7" cy="19.1" r="2.6"/><circle cx="58.3" cy="19.1" r="2.6"/><circle cx="72.6" cy="27.4" r="2.6"/><circle cx="80.9" cy="41.7" r="2.6"/><circle cx="50.0" cy="7.0" r="3.0"/><circle cx="50.0" cy="93.0" r="3.0"/></svg>Cross-swap <span class="soon">SOON</span></button>
   </nav>
 
   <div class="seg" id="seg">
