@@ -133,8 +133,7 @@
     color:var(--text);font:inherit;font-weight:600;transition:.15s}
   .wrow:hover{border-color:var(--line2);background:#131c28}
   .wrow.off{opacity:.55}
-  .wbadge{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:800;font-size:13px}
+  .wicon{width:26px;height:26px;flex:0 0 auto;border-radius:7px;object-fit:contain}
   .wname{flex:1}
   .wtag{font-size:10.5px;font-weight:700;color:var(--muted);border:1px solid var(--line2);border-radius:6px;padding:2px 6px}
   .wnote{color:var(--muted);font-size:11px;line-height:1.45;margin:12px 4px 2px}
@@ -450,10 +449,10 @@ function setNet(n) {
 
 // ---- Multi-wallet: Keplr (Cosmos-native) + MetaMask / Rabby / Brave (EVM, EIP-712) ----
 const WALLETS = {
-  keplr:    { name: "Keplr",    kind: "cosmos", color: "#7b5cff", mono: "K", rdns: null,               url: "https://www.keplr.app/download" },
-  metamask: { name: "MetaMask", kind: "evm",    color: "#f6851b", mono: "M", rdns: "io.metamask",      url: "https://metamask.io/download" },
-  rabby:    { name: "Rabby",    kind: "evm",    color: "#7084ff", mono: "R", rdns: "io.rabby",         url: "https://rabby.io" },
-  brave:    { name: "Brave",    kind: "evm",    color: "#fb542b", mono: "B", rdns: "com.brave.wallet", url: "https://brave.com/wallet" },
+  keplr:    { name: "Keplr",    kind: "cosmos", icon: "/icons/w-keplr.png",    rdns: null,               url: "https://www.keplr.app/download" },
+  metamask: { name: "MetaMask", kind: "evm",    icon: "/icons/w-metamask.svg", rdns: "io.metamask",      url: "https://metamask.io/download" },
+  rabby:    { name: "Rabby",    kind: "evm",    icon: "/icons/w-rabby.svg",    rdns: "io.rabby",         url: "https://rabby.io" },
+  brave:    { name: "Brave",    kind: "evm",    icon: "/icons/w-brave.svg",    rdns: "com.brave.wallet", url: "https://brave.com/wallet" },
 };
 // EIP-6963: collect announced EVM providers (keyed by rdns).
 const evmProviders = new Map();
@@ -516,7 +515,7 @@ function openWalletModal() {
     const row = document.createElement(ok ? "button" : "a");
     row.className = "wrow" + (ok ? "" : " off");
     if (!ok) { row.href = w.url; row.target = "_blank"; row.rel = "noopener"; }
-    row.innerHTML = `<span class="wbadge" style="background:${w.color}">${w.mono}</span>` +
+    row.innerHTML = `<img class="wicon" src="${w.icon}" alt="" width="26" height="26"/>` +
       `<span class="wname">${w.name}</span>` +
       `<span class="wtag">${ok ? (w.kind === "evm" ? "EVM" : "Cosmos") : "Install ↗"}</span>`;
     if (ok) row.addEventListener("click", () => connectWallet(id));
