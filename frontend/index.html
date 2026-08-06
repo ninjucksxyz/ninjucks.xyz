@@ -288,7 +288,8 @@ const NETS = {
     rest: "https://testnet.sentry.lcd.injective.network",
     indexer: "https://testnet.sentry.exchange.grpc-web.injective.network",
     explorer: "https://testnet.explorer.injective.network/transaction/",
-    contract: "inj18lm2ulhqfmzjf5p2sg0candl2cwhk3r47pd2ye",
+    contract: "inj18nrwl6k4rq78szj6dp28mveklms6l5q469eg9c",   // ninjucks wired to real HallSwap + Helix adapter
+    helix: "inj16w8tmrmdkscdw5p3vjekthz6zwgrwl0usad6wy",       // Helix orderbook adapter (route legs)
     markets: [
       { id: "0x4ca031b7c8504fa2a8ee2fe6a47b78c7a8e01975c8c28e05029e07b2c5ec9ef5", base: "INJ", quote: "USDC" },
       { id: "0xce993e4896795ac8ec529d90eb51a195fba38cd8885111b7b6d5c4085dbe373d", base: "hINJ", quote: "INJ" },
@@ -415,11 +416,17 @@ async function runQuote() {
 function buildExecuteMsg() {
   const cfg = NETS[net];
   const out = outTok();
-  // Testnet demo route: the mock venue pays the quoted output back. On mainnet this is the
-  // venue-native route body produced by the off-chain path builder.
-  const ret = quote ? quote.expected.toString() : "0";
-  const route = cfg.live ? b64({ mock_swap: { return_denom: out.denom, return_amount: ret } })
-                         : "<venue-native route body, base64>";
+  // Real HallSwap route: one Helix orderbook leg on the selected market. ninjucks forwards this
+  // verbatim to the HallSwap router; slippage is enforced by ninjucks' own `minimum_receive`.
+  const mk = findMarket(inTok().sym, out.sym);
+  const offerAmount = toBase($("amount").value, inTok().dec);
+  const route = (cfg.live && cfg.helix && mk)
+    ? b64({ execute_routes: {
+        offer_asset_info: { native_token: { denom: inTok().denom } },
+        routes: [{ route: [{ contract_addr: cfg.helix, interface: { helix: { market_id: mk.id } } }], offer_amount: offerAmount }],
+        minimum_receive: "1",
+      } })
+    : "<venue-native route body, base64>";
   return { swap: {
     venue: "hallswap", route, ask_denom: out.denom,
     minimum_receive: (quote ? quote.minOut.toString() : "1"), recipient: null,
