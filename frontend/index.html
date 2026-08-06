@@ -119,6 +119,8 @@
     border-top-color:var(--accent2);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:6px}
   @keyframes sp{to{transform:rotate(360deg)}}
   .acct{font-size:11.5px;color:#5b6a82;margin:4px 6px 0;text-align:right}
+  .acct .disc{background:none;border:0;color:var(--accent2);font:inherit;cursor:pointer;padding:0 0 0 2px;text-decoration:underline}
+  .acct .disc:hover{opacity:.75}
 
   .wmodal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center}
   .wmodal[hidden]{display:none}
@@ -452,7 +454,7 @@ function refresh() {
     $("payBal").textContent = `Balance: ${fmt(fromBase(balOf(inTok().denom), inTok().dec))} ${inTok().sym}`;
     $("payBal").classList.add("max");
     $("recvBal").textContent = `Balance: ${fmt(fromBase(balOf(outTok().denom), outTok().dec))} ${outTok().sym}`;
-    $("acct").textContent = `${wallet.name} · ${wallet.address.slice(0, 11)}…${wallet.address.slice(-5)}`;
+    $("acct").innerHTML = `${wallet.name} · ${wallet.address.slice(0, 11)}…${wallet.address.slice(-5)} <button class="disc" id="acctDisc">Disconnect</button>`;
   } else {
     $("payBal").textContent = ""; $("recvBal").textContent = ""; $("acct").textContent = "";
     $("payBal").classList.remove("max");
@@ -563,6 +565,12 @@ const WALLET_KEY = "ninjucks_wallet";
 function autoReconnect() {
   let id = null; try { id = localStorage.getItem(WALLET_KEY); } catch (_) {}
   if (id && WALLETS[id]) connectWallet(id, { silent: true });
+}
+function disconnectWallet() {
+  wallet = null;
+  try { localStorage.removeItem(WALLET_KEY); } catch (_) {}
+  setStatus("");
+  refresh();
 }
 
 function openWalletModal() {
@@ -724,6 +732,7 @@ function runQuoteSlip() {
 initTokens();
 setNet("testnet");
 
+$("acct").addEventListener("click", (e) => { if (e.target.id === "acctDisc") disconnectWallet(); });
 $("wClose").addEventListener("click", closeWalletModal);
 $("wBack").addEventListener("click", closeWalletModal);
 $("termsChk").addEventListener("change", () => { $("termsOk").disabled = !$("termsChk").checked; });

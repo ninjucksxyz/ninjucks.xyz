@@ -273,6 +273,18 @@ try {
     ok("no auto-connect without a saved wallet", (await page.evaluate(() => window.__ninjucks.wallet)) === null);
     await page.close();
   }
+
+  // 19. Disconnect clears the wallet and the persisted session.
+  {
+    const page = await freshPage({ withKeplr: true });
+    await connect(page);
+    ok("disconnect link shows when connected", (await page.$("#acctDisc")) !== null);
+    await page.click("#acctDisc");
+    ok("disconnect clears wallet", (await page.evaluate(() => window.__ninjucks.wallet)) === null);
+    ok("disconnect clears persisted key", (await page.evaluate(() => localStorage.getItem("ninjucks_wallet"))) === null);
+    ok("button back to Connect wallet", (await btnText(page)) === "Connect wallet");
+    await page.close();
+  }
 } finally { await browser.close(); server.close(); }
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} passed, ${fail} failed`);
