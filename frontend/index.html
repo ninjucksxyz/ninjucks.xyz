@@ -658,7 +658,10 @@ async function onSwap() {
     if (!wallet) { openWalletModal(); return; }
     const amount = toBase($("amount").value, inTok().dec);
     if (BigInt(amount) > BigInt(balOf(inTok().denom))) throw new Error(`Insufficient ${inTok().sym} balance.`);
-    if (!quote || quote.expected === 0n) throw new Error("No live quote.");
+    // Re-quote synchronously so minimum_receive matches THIS exact amount + direction (a stale
+    // quote from a flip or a mid-debounce amount edit would set a mismatched floor and revert).
+    await runQuote();
+    if (!quote || quote.expected === 0n) throw new Error("No liquidity for this trade.");
     const execMsg = buildExecuteMsg();
     const send = window.__NINJUCKS_TEST_BROADCAST || (wallet.type === "evm" ? evmBroadcast : realBroadcast);
     const hash = await send({ cfg, execMsg, amount, offerDenom: inTok().denom });
