@@ -271,13 +271,13 @@
 
 <script type="module">
 const SDK = "./vendor/injective.min.js";
-const FEE = { amount: [{ denom: "inj", amount: "2000000000000000" }], gas: "700000" };
+const GAS_PRICE = 500000000n;   // inj per gas unit (0.5 gwei) — at/above the network minimum
+const SIM_PUBKEY = btoa(String.fromCharCode(2, ...Array(32).fill(1)));   // dummy key for gas simulation only
 const REG = "https://raw.githubusercontent.com/cosmos/chain-registry/master";
 
 const TOKENS = [
   { sym: "INJ",  denom: "inj", dec: 18, logo: `${REG}/injective/images/inj.png` },
   { sym: "USDC", denom: "factory/inj17vytdwqczqz72j65saukplrktd4gyfme5agf6c/usdc", dec: 6, logo: `${REG}/_non-cosmos/ethereum/images/usdc.png` },
-  { sym: "hINJ", denom: "factory/inj1uz8hvs0pqna5ay66z8pszcjewmn85udzus9syr/inj1u5zugw73cvcj43efq5j3ns4y7tqvq52u4nvqu9", dec: 18, logo: `${REG}/injective/images/hinj.png` },
 ];
 const tok = (sym) => TOKENS.find((t) => t.sym === sym) || TOKENS[0];
 
@@ -292,7 +292,6 @@ const NETS = {
     helix: "inj16w8tmrmdkscdw5p3vjekthz6zwgrwl0usad6wy",       // Helix orderbook adapter (route legs)
     markets: [
       { id: "0x4ca031b7c8504fa2a8ee2fe6a47b78c7a8e01975c8c28e05029e07b2c5ec9ef5", base: "INJ", quote: "USDC" },
-      { id: "0xce993e4896795ac8ec529d90eb51a195fba38cd8885111b7b6d5c4085dbe373d", base: "hINJ", quote: "INJ" },
     ],
     live: true,
   },
@@ -570,11 +569,30 @@ function openWalletModal() {
 }
 function closeWalletModal() { const m = $("walletModal"); if (m) m.hidden = true; }
 
+// Simulate the tx and set gas to 1.5x the estimate (the HallSwap -> orderbook path needs well
+// above a flat default, so a fixed gas runs out). Falls back to a safe 3M if simulation fails.
+async function computeFee(rest, msg, pubKey, account, chainId) {
+  const S = await import(SDK);
+  let gas = 3000000n;
+  try {
+    const { txRaw } = S.createTransaction({ message: msg, memo: "ninjucks swap",
+      fee: { amount: [{ denom: "inj", amount: "1500000000000000" }], gas: "3000000" },
+      pubKey, sequence: account.sequence, accountNumber: account.accountNumber, chainId });
+    const sim = await new S.TxRestApi(rest).simulate(txRaw);
+    const used = BigInt(sim.gasInfo.gasUsed);
+    if (used > 0n) gas = used * 3n / 2n;
+  } catch (_) { /* keep 3M fallback */ }
+  if (gas < 500000n) gas = 500000n;
+  return { amount: [{ denom: "inj", amount: (gas * GAS_PRICE).toString() }], gas: gas.toString() };
+}
+
 async function realBroadcast({ cfg, execMsg, amount, offerDenom }) {
   const { MsgExecuteContract, ChainRestAuthApi, createTransaction, TxRestApi, BaseAccount } = await import(SDK);
   setStatus('<span class="spin"></span>Fetching account…');
   const account = BaseAccount.fromRestApi(await new ChainRestAuthApi(cfg.rest).fetchAccount(wallet.address));
   const msg = MsgExecuteContract.fromJSON({ sender: wallet.address, contractAddress: cfg.contract, msg: execMsg, funds: [{ denom: offerDenom, amount }] });
+  setStatus('<span class="spin"></span>Simulating gas…');
+  const FEE = await computeFee(cfg.rest, msg, bytesToB64(wallet.pubKey), account, cfg.chainId);
   setStatus('<span class="spin"></span>Building transaction…');
   const { signDoc, txRaw } = createTransaction({ message: msg, memo: "ninjucks swap", fee: FEE, pubKey: bytesToB64(wallet.pubKey), sequence: account.sequence, accountNumber: account.accountNumber, chainId: cfg.chainId });
   setStatus('<span class="spin"></span>Awaiting signature…');
@@ -602,6 +620,8 @@ async function evmBroadcast({ cfg, execMsg, amount, offerDenom }) {
   const swapMsg = execMsg && execMsg.swap ? { swap: { ...execMsg.swap, recipient: execMsg.swap.recipient ?? wallet.address } } : execMsg;
   const msg = S.MsgExecuteContractCompat.fromJSON({ sender: wallet.address, contractAddress: cfg.contract, msg: swapMsg, funds: [{ denom: offerDenom, amount }] });
   const tx = { accountNumber: account.accountNumber.toString(), sequence: account.sequence.toString(), timeoutHeight, chainId: cfg.chainId, memo: "ninjucks swap" };
+  setStatus('<span class="spin"></span>Simulating gas…');
+  const FEE = await computeFee(cfg.rest, msg, SIM_PUBKEY, account, cfg.chainId);
   setStatus('<span class="spin"></span>Building transaction…');
   const eip712 = S.getEip712TypedData({ msgs: msg, tx, fee: FEE, ethereumChainId: cfg.evmChainId });
   setStatus('<span class="spin"></span>Awaiting signature…');

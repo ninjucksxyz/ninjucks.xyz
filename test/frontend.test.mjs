@@ -86,26 +86,17 @@ try {
     await page.close();
   }
 
-  // 2b. hINJ token + pair constraints (INJ pairs with USDC & hINJ; USDC only with INJ).
+  // 2b. Pair constraints: only INJ<->USDC is offered (hINJ removed).
   {
     const page = await freshPage();
     const inOpts = await page.$$eval("#tokenIn option", (os) => os.map((o) => o.value));
-    ok("hINJ selectable as input", inOpts.includes("hINJ"), inOpts.join(","));
+    ok("input tokens = INJ + USDC only", inOpts.length === 2 && inOpts.includes("INJ") && inOpts.includes("USDC"), inOpts.join(","));
+    ok("hINJ not selectable", !inOpts.includes("hINJ"), inOpts.join(","));
     const injOuts = await page.$$eval("#tokenOut option", (os) => os.map((o) => o.value));
-    ok("INJ output options = USDC + hINJ", injOuts.includes("USDC") && injOuts.includes("hINJ"), injOuts.join(","));
-    // pick hINJ out → quote runs, ask_denom is hINJ
-    await page.select("#tokenOut", "hINJ");
-    await page.waitForFunction(() => window.__ninjucks.quote && window.__ninjucks.quote.expected > 0n, { timeout: 5000 });
-    const msg = JSON.parse(await text(page, "#msgPreview"));
-    ok("INJ->hINJ ask_denom is hINJ", msg.swap.ask_denom.includes("inj1u5zugw"), msg.swap.ask_denom);
-    // switch input to USDC → output restricted to INJ only
+    ok("INJ output options = USDC only", injOuts.length === 1 && injOuts[0] === "USDC", injOuts.join(","));
     await page.select("#tokenIn", "USDC");
     const usdcOuts = await page.$$eval("#tokenOut option", (os) => os.map((o) => o.value));
     ok("USDC output options = INJ only", usdcOuts.length === 1 && usdcOuts[0] === "INJ", usdcOuts.join(","));
-    // switch input to hINJ → output INJ only
-    await page.select("#tokenIn", "hINJ");
-    const hinjOuts = await page.$$eval("#tokenOut option", (os) => os.map((o) => o.value));
-    ok("hINJ output options = INJ only", hinjOuts.length === 1 && hinjOuts[0] === "INJ", hinjOuts.join(","));
     await page.close();
   }
 
