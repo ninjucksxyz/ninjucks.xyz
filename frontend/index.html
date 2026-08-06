@@ -599,6 +599,24 @@ async function computeFee(rest, msg, pubKey, account, chainId) {
   return { amount: [{ denom: "inj", amount: (gas * GAS_PRICE).toString() }], gas: gas.toString() };
 }
 
+// Broadcast via a direct POST so we can read the node's response body. The SDK's broadcast throws a
+// generic "request failed" on this LCD's HTTP-500-on-reject, which hides the real CheckTx reason.
+async function broadcastTxRaw(rest, txRaw) {
+  const S = await import(SDK);
+  const res = await fetch(`${rest}/cosmos/tx/v1beta1/txs`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tx_bytes: S.TxClient.encode(txRaw), mode: "BROADCAST_MODE_SYNC" }),
+  });
+  const body = await res.json().catch(() => ({}));
+  const fail = (log) => {
+    if (/sequence mismatch/i.test(log)) throw new Error("Account out of sync — try the swap again.");
+    throw new Error((log || "broadcast failed").replace(/^broadcast error on transaction validation: /, "").slice(0, 220));
+  };
+  const r = body.tx_response;
+  if (r) { if (r.code && r.code !== 0) fail(r.raw_log || `code ${r.code}`); return r.txhash; }
+  fail(body.message || `broadcast failed (${res.status})`);
+}
+
 async function realBroadcast({ cfg, execMsg, amount, offerDenom }) {
   const { MsgExecuteContract, ChainRestAuthApi, createTransaction, TxRestApi, BaseAccount } = await import(SDK);
   setStatus('<span class="spin"></span>Fetching account…');
@@ -613,10 +631,7 @@ async function realBroadcast({ cfg, execMsg, amount, offerDenom }) {
   txRaw.bodyBytes = s.signed.bodyBytes; txRaw.authInfoBytes = s.signed.authInfoBytes;
   txRaw.signatures = [b64ToBytes(s.signature.signature)];
   setStatus('<span class="spin"></span>Broadcasting…');
-  const res = await new TxRestApi(cfg.rest).broadcast(txRaw);
-  const hash = res.txHash || res.txhash;
-  if (res.code && res.code !== 0) throw new Error(res.rawLog || ("code " + res.code));
-  return hash;
+  return broadcastTxRaw(cfg.rest, txRaw);
 }
 
 // EVM wallets (MetaMask / Rabby / Brave) sign the tx as EIP-712 typed data; Injective's ante
@@ -644,10 +659,7 @@ async function evmBroadcast({ cfg, execMsg, amount, offerDenom }) {
   const txRawEip712 = S.createTxRawEIP712(txRaw, S.createWeb3Extension({ ethereumChainId: cfg.evmChainId }));
   txRawEip712.signatures = [Uint8Array.from(signature.replace(/^0x/, "").match(/.{2}/g).map((h) => parseInt(h, 16)))];
   setStatus('<span class="spin"></span>Broadcasting…');
-  const res = await new S.TxRestApi(cfg.rest).broadcast(txRawEip712);
-  const hash = res.txHash || res.txhash;
-  if (res.code && res.code !== 0) throw new Error(res.rawLog || ("code " + res.code));
-  return hash;
+  return broadcastTxRaw(cfg.rest, txRawEip712);
 }
 
 async function onSwap() {
