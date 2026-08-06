@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ninjucks Docs</title>
+<meta name="description" content="Documentation for Ninjucks — a unified swap interface for Injective."/>
+<link rel="icon" href="/favicon.ico" sizes="48x48"/>
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png"/>
+<meta name="theme-color" content="#0a0e14"/>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0a0e14; --card:#141b26; --card2:#0e141d;
+    --line:#212b3a; --line2:#2c3a4e; --muted:#7d8aa0; --text:#e8eef7;
+    --accent:#4f8cff; --accent2:#38e0c8;
+    --nav:64px; --side:248px; --content:760px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.88em;
+    background:#0e1521;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:#b7c6dc}
+  pre{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow:auto;margin:14px 0}
+  pre code{background:none;border:0;padding:0;color:#c6d3e6;font-size:12.5px;line-height:1.6}
+
+  /* top nav */
+  header{position:fixed;top:0;left:0;right:0;height:var(--nav);z-index:30;display:flex;align-items:center;
+    gap:14px;padding:0 20px;background:rgba(10,14,20,.82);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--text)}
+  .brand img{width:26px;height:26px}
+  .brand .tag{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--accent2);
+    border:1px solid #23413f;background:#0d1c1b;border-radius:6px;padding:2px 6px;text-transform:uppercase}
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:20px;font-size:13.5px;font-weight:600}
+  .nav-links a{color:var(--muted)} .nav-links a:hover{color:var(--text);text-decoration:none}
+  .nav-links .cta{color:#04140f;background:linear-gradient(135deg,#5b9dff,var(--accent2));padding:7px 13px;border-radius:9px}
+  .nav-links .cta:hover{opacity:.92;text-decoration:none}
+  .menu-btn{display:none;background:none;border:1px solid var(--line2);border-radius:8px;color:var(--text);
+    width:34px;height:34px;font-size:16px;cursor:pointer}
+
+  /* layout */
+  .layout{display:flex;max-width:1240px;margin:0 auto;padding-top:var(--nav)}
+  aside{position:fixed;top:var(--nav);bottom:0;width:var(--side);overflow-y:auto;padding:24px 8px 40px 20px;
+    border-right:1px solid var(--line)}
+  aside .group{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#586780;margin:18px 10px 8px}
+  aside a{display:block;color:var(--muted);font-size:14px;font-weight:500;padding:6px 10px;border-radius:8px;line-height:1.35}
+  aside a:hover{color:var(--text);background:#121a26;text-decoration:none}
+  aside a.active{color:var(--text);background:#132131;box-shadow:inset 2px 0 0 var(--accent2)}
+
+  main{margin-left:var(--side);flex:1;min-width:0;padding:36px 40px 100px;max-width:calc(var(--side) + var(--content) + 80px)}
+  .doc{max-width:var(--content)}
+  h1{font-size:34px;line-height:1.15;margin:0 0 6px;letter-spacing:-.5px}
+  .lead{color:var(--muted);font-size:17px;margin:0 0 26px}
+  h2{font-size:22px;margin:44px 0 12px;padding-top:8px;letter-spacing:-.3px;scroll-margin-top:80px}
+  h2:first-of-type{margin-top:8px}
+  h3{font-size:16px;margin:26px 0 8px}
+  p{margin:12px 0}
+  ul,ol{padding-left:22px;margin:12px 0} li{margin:7px 0}
+  hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:16px 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+  .grid .card{margin:0}
+  .k{color:#8ea2bd;font-weight:600}
+  .badge{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  .badge.live{color:#7ee6b0;background:#0c1f18;border:1px solid #1e4636}
+  .badge.soon{color:var(--accent2);background:#0d1c1b;border:1px solid #23413f}
+  .note{background:#0c1622;border:1px solid #1d3350;border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;margin:16px 0;font-size:14px;color:#c2d2ea}
+  .steps{counter-reset:s;list-style:none;padding:0}
+  .steps li{counter-increment:s;position:relative;padding-left:38px;margin:14px 0}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:26px;height:26px;border-radius:50%;
+    background:#132131;border:1px solid var(--line2);color:var(--accent2);font-weight:800;font-size:13px;
+    display:flex;align-items:center;justify-content:center}
+  footer{margin-left:var(--side);border-top:1px solid var(--line);padding:22px 40px;color:#4c5a70;font-size:13px}
+  footer a{color:#6b7c96}
+
+  @media(max-width:900px){
+    .menu-btn{display:block}
+    aside{transform:translateX(-100%);transition:.2s;background:var(--bg);width:270px;z-index:25;padding-top:16px}
+    body.menu aside{transform:none;box-shadow:20px 0 60px -20px #000}
+    main,footer{margin-left:0}
+    main{padding:24px 20px 80px}
+    .grid{grid-template-columns:1fr}
+    .nav-links .hide-sm{display:none}
+    h1{font-size:28px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+  <a class="brand" href="/"><img src="/icons/n.png" alt=""/>Ninjucks <span class="tag">Docs</span></a>
+  <nav class="nav-links">
+    <a class="hide-sm" href="https://github.com/ninjucksxyz/ninjucks.xyz" target="_blank" rel="noopener">GitHub</a>
+    <a class="hide-sm" href="https://hub.injective.network/proposals/680" target="_blank" rel="noopener">Governance</a>
+    <a class="cta" href="https://ninjucks.xyz" target="_blank" rel="noopener">Open App ↗</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside id="side">
+    <div class="group">Overview</div>
+    <a href="#introduction">Introduction</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#quickstart">Quickstart</a>
+    <div class="group">Using Ninjucks</div>
+    <a href="#wallets">Wallets</a>
+    <a href="#networks">Networks</a>
+    <a href="#slippage">Slippage &amp; min received</a>
+    <div class="group">Under the hood</div>
+    <a href="#routing">Routing &amp; settlement</a>
+    <a href="#contract">Contract &amp; verification</a>
+    <div class="group">More</div>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#faq">FAQ</a>
+  </aside>
+
+  <main>
+   <div class="doc">
+    <h1>Ninjucks Docs</h1>
+    <p class="lead">A unified swap interface for Injective. One place to route swaps across Injective's
+      DEX liquidity — with a floor you set, settled in a single transaction.</p>
+
+    <h2 id="introduction">Introduction</h2>
+    <p>Ninjucks routes a swap through Injective's on-chain DEX liquidity, enforces the minimum amount
+      you're willing to receive, and settles the whole thing atomically — if it can't meet your floor,
+      the transaction reverts and nothing moves.</p>
+    <p>We come from the <strong>Cardano</strong> community and are exploring an IBC interface between
+      Cardano and Injective. Ninjucks is the first milestone: a simple, transparent swap layer to build
+      that cross-chain flow on.</p>
+
+    <h2 id="how-it-works">How it works</h2>
+    <p>At a high level, every swap is one signed transaction:</p>
+    <ol class="steps">
+      <li>You choose a pair and an amount. Ninjucks quotes the expected output from the live orderbook.</li>
+      <li>You set a max slippage; that becomes a hard <span class="k">minimum-receive</span> floor.</li>
+      <li>You sign. The aggregator routes the swap through a venue, checks the output clears your floor,
+        and pays it to you — all in the same transaction.</li>
+      <li>If the output would fall below your floor, the transaction reverts. You keep your funds.</li>
+    </ol>
+
+    <h2 id="quickstart">Quickstart</h2>
+    <ol class="steps">
+      <li>Open the <a href="https://ninjucks.xyz" target="_blank" rel="noopener">app</a> and pick a network (Testnet is live).</li>
+      <li>Connect a wallet — Keplr, MetaMask, Rabby, or Brave.</li>
+      <li>Pick the pair, enter an amount, review the expected output and minimum received.</li>
+      <li>Hit <strong>Swap</strong> and approve in your wallet. Balances refresh once the swap settles.</li>
+    </ol>
+
+    <hr/>
+
+    <h2 id="wallets">Wallets</h2>
+    <p>Ninjucks supports both Cosmos and EVM wallets. An EVM wallet works because Injective accounts and
+      Ethereum accounts share the same key type — your EVM address maps to a matching Injective account,
+      and the transaction is signed as <a href="https://eips.ethereum.org/EIPS/eip-712" target="_blank" rel="noopener">EIP-712</a> typed data.</p>
+    <div class="grid">
+      <div class="card"><span class="k">Keplr</span><br/>Cosmos-native signing.</div>
+      <div class="card"><span class="k">MetaMask · Rabby · Brave</span><br/>EVM wallets, via EIP-712.</div>
+    </div>
+    <p>Your connection persists across reloads; use <span class="k">Disconnect</span> next to your address to end the session.</p>
+
+    <h2 id="networks">Networks</h2>
+    <div class="grid">
+      <div class="card"><span class="k">Testnet</span> <span class="badge live">Live</span><br/>
+        <code>injective-888</code> · swap INJ ↔ USDC against the live orderbook.</div>
+      <div class="card"><span class="k">Mainnet</span> <span class="badge soon">Pending governance</span><br/>
+        <code>injective-1</code> · gated on proposal
+        <a href="https://hub.injective.network/proposals/680" target="_blank" rel="noopener">#680</a>.</div>
+    </div>
+
+    <h2 id="slippage">Slippage &amp; minimum received</h2>
+    <p>The <span class="k">max slippage</span> you choose sets your <span class="k">minimum received</span> —
+      the least output you'll accept. Ninjucks re-quotes the moment before you sign, so the floor always
+      matches the exact amount and direction you're swapping.</p>
+    <div class="note">If the market moves past your slippage between signing and settlement, the swap
+      reverts rather than filling at a worse price. Raise the slippage for more headroom on volatile pairs.</div>
+
+    <hr/>
+
+    <h2 id="routing">Routing &amp; settlement</h2>
+    <p>Ninjucks forwards each swap to a DEX venue on Injective (HallSwap today, with room for more) and
+      accounts for the result by balance difference: it measures what actually arrived and compares it to
+      your floor. Every swap settles within its own transaction — funds are never parked in the contract,
+      and a swap that can't meet its floor reverts in full.</p>
+
+    <h2 id="contract">Contract &amp; verification</h2>
+    <p>The contract is built with the standard <code>cosmwasm/optimizer</code> and a committed
+      <code>Cargo.lock</code>, so the build is reproducible — anyone can rebuild it and confirm the hash.</p>
+    <pre><code>ninjucks.wasm  SHA256  0c983abbc0373b28d4a7aa5a25fe059d36dc13604459a97c3a1ca1b01e888bb4</code></pre>
+    <p>The mainnet governance proposal uploads this exact wasm; the on-chain <code>code data_hash</code>
+      equals the SHA256 above. Source and reproduction steps live in the
+      <a href="https://github.com/ninjucksxyz/ninjucks.xyz" target="_blank" rel="noopener">repository</a>.</p>
+
+    <hr/>
+
+    <h2 id="roadmap">Roadmap</h2>
+    <ul>
+      <li><span class="k">Swap</span> <span class="badge live">Live</span> — unified swaps across Injective liquidity.</li>
+      <li><span class="k">Lend / Borrow</span> <span class="badge soon">Soon</span> — a money-market interface.</li>
+      <li><span class="k">Cross-swap</span> <span class="badge soon">Soon</span> — swaps across an IBC bridge to Cardano.</li>
+    </ul>
+
+    <h2 id="faq">FAQ</h2>
+    <h3>Does Ninjucks charge a fee?</h3>
+    <p>No protocol fee. You pay the underlying venue's trading fee and network gas, nothing on top.</p>
+    <h3>Who controls my funds?</h3>
+    <p>You do. Every swap moves funds only inside a transaction you sign yourself; the contract never
+      holds balances between swaps.</p>
+    <h3>Which assets can I swap?</h3>
+    <p>On testnet, INJ ↔ USDC today. More pairs and venues follow as mainnet goes live.</p>
+    <h3>Why does gas get simulated first?</h3>
+    <p>Routing through the orderbook needs more gas than a plain transfer, so the app simulates the
+      transaction and adds headroom, so swaps don't run out of gas mid-execution.</p>
+   </div>
+  </main>
+</div>
+<footer>Ninjucks · <a href="https://ninjucks.xyz" target="_blank" rel="noopener">app</a> ·
+  <a href="https://github.com/ninjucksxyz/ninjucks.xyz" target="_blank" rel="noopener">GitHub</a></footer>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const menuBtn = $("#menuBtn");
+  menuBtn.addEventListener("click", () => document.body.classList.toggle("menu"));
+  // close the mobile menu when a link is tapped
+  document.querySelectorAll("#side a").forEach((a) => a.addEventListener("click", () => document.body.classList.remove("menu")));
+  // active-section highlight
+  const links = [...document.querySelectorAll("#side a")];
+  const byId = Object.fromEntries(links.map((a) => [a.getAttribute("href").slice(1), a]));
+  const obs = new IntersectionObserver((ents) => {
+    ents.forEach((e) => {
+      if (e.isIntersecting) {
+        links.forEach((l) => l.classList.remove("active"));
+        (byId[e.target.id] || {}).classList?.add("active");
+      }
+    });
+  }, { rootMargin: "-70px 0px -70% 0px" });
+  document.querySelectorAll("main h2[id]").forEach((h) => obs.observe(h));
+</script>
+</body>
+</html>
