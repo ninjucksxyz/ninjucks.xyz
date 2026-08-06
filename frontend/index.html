@@ -404,6 +404,15 @@ function scheduleBalanceRetry(n = 0) {
     catch (_) { scheduleBalanceRetry(n + 1); }
   }, 2000 * (n + 1));
 }
+// Broadcast is async: poll for the tx to land, then refresh balances so they reflect the swap.
+async function waitAndRefreshBalances(cfg, hash, addr) {
+  for (let i = 0; i < 15; i++) {
+    await new Promise((r) => setTimeout(r, 1200));
+    try { if ((await fetch(`${cfg.rest}/cosmos/tx/v1beta1/txs/${hash}`)).ok) break; } catch (_) {}
+  }
+  if (!wallet || wallet.address !== addr) return;
+  try { wallet.balances = await fetchBalances(cfg.rest, addr); refresh(); } catch (_) {}
+}
 
 // Walk the book. INJ->USDC sells into bids; USDC->INJ buys from asks. Returns output base units.
 function walkQuote(ob, sellingBase, amountInBase) {
@@ -725,7 +734,7 @@ async function onSwap() {
     const send = window.__NINJUCKS_TEST_BROADCAST || (wallet.type === "evm" ? evmBroadcast : realBroadcast);
     const hash = await send({ cfg, execMsg, amount, offerDenom: inTok().denom });
     setStatus(`✅ Swap sent — <a href="${cfg.explorer}${hash}" target="_blank" rel="noopener">${String(hash).slice(0,14)}…</a>`, "ok");
-    try { wallet.balances = await fetchBalances(cfg.rest, wallet.address); } catch (_) {}
+    waitAndRefreshBalances(cfg, hash, wallet.address);
   } catch (e) { setStatus("⚠️ " + (e?.message || e), "err"); }
   finally { refresh(); }
 }
