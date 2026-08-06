@@ -55,6 +55,8 @@ jobs:
       - name: Build SDK bundle
         working-directory: build
         run: npm ci && node build.mjs
+      - name: Stamp build version
+        run: printf '{"sha":"%s","date":"%s"}\n' "$(git rev-parse --short HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > frontend/version.json
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

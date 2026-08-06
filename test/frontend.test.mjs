@@ -52,6 +52,7 @@ async function freshPage({ withKeplr = false, withHook = false, withEvm = false,
       const u = String(url);
       if (u.includes("/cosmos/bank/v1beta1/balances/")) return { ok: true, json: async () => ({ balances: Object.entries(flags.balances).map(([denom, amount]) => ({ denom, amount })) }) };
       if (u.includes("/api/exchange/spot/v2/orderbook/")) return { ok: true, json: async () => ({ orderbook: flags.book }) };
+      if (u.includes("version.json")) return { ok: true, json: async () => ({ sha: "abc1234", date: "2026-08-06T06:40:00Z" }) };
       return _fetch(url, opt);
     };
   }, { withKeplr, withHook, withEvm, acceptTerms, savedWallet, balances, book });
@@ -283,6 +284,18 @@ try {
     ok("disconnect clears wallet", (await page.evaluate(() => window.__ninjucks.wallet)) === null);
     ok("disconnect clears persisted key", (await page.evaluate(() => localStorage.getItem("ninjucks_wallet"))) === null);
     ok("button back to Connect wallet", (await btnText(page)) === "Connect wallet");
+    await page.close();
+  }
+
+  // 20. Footer build stamp shows the SHA and toggles to the deploy date on tap.
+  {
+    const page = await freshPage();
+    await page.waitForFunction(() => !document.getElementById("build").hidden, { timeout: 5000 });
+    ok("footer shows build sha", (await text(page, "#build")) === "abc1234");
+    await page.click("#build");
+    ok("tap reveals deploy date", (await text(page, "#build")).toLowerCase().includes("deployed"));
+    await page.click("#build");
+    ok("tap again back to sha", (await text(page, "#build")) === "abc1234");
     await page.close();
   }
 } finally { await browser.close(); server.close(); }

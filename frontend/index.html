@@ -158,6 +158,8 @@
   footer{margin-top:24px;text-align:center;color:#4c5a70;font-size:12px}
   footer a{color:#61708a;text-decoration:none}footer a:hover{color:var(--accent2)}
   footer .sep{margin:0 8px;opacity:.5}
+  footer .build{background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;text-decoration:underline dotted;text-underline-offset:2px}
+  footer .build:hover{color:var(--muted)}
 
   @media (min-width:680px){
     :root{--amt:30px;--radius:18px}
@@ -268,6 +270,7 @@
     <a href="https://github.com/ninjucksxyz/ninjucks.xyz" target="_blank" rel="noopener">GitHub</a>
     <span class="sep">·</span><a href="https://ninjucks.xyz" target="_blank" rel="noopener">ninjucks.xyz</a>
     <span class="sep">·</span>open source
+    <span class="sep" id="buildSep" hidden>·</span><button class="build" id="build" hidden></button>
   </footer>
 </div>
 
@@ -367,15 +370,39 @@ function syncPairOptions() {
   $("tokenOut").value = outs.some((t) => t.sym === cur) ? cur : (outs[0] ? outs[0].sym : "");
 }
 
+// General retrying JSON fetch: transient RPC/indexer blips are common, so retry with backoff
+// and a per-attempt timeout instead of failing on the first hiccup.
+async function fetchJson(url, { retries = 3, timeout = 8000 } = {}) {
+  let err;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), timeout);
+      const r = await fetch(url, { signal: ctl.signal });
+      clearTimeout(t);
+      if (r.ok) return await r.json();
+      err = new Error(`HTTP ${r.status}`);
+    } catch (e) { err = e; }
+    if (i < retries - 1) await new Promise((res) => setTimeout(res, 400 * (i + 1)));
+  }
+  throw err || new Error("request failed");
+}
 async function fetchBalances(rest, addr) {
-  const r = await fetch(`${rest}/cosmos/bank/v1beta1/balances/${addr}?pagination.limit=1000`);
-  if (!r.ok) throw new Error("balance query failed");
-  const m = {}; for (const c of (await r.json()).balances || []) m[c.denom] = c.amount; return m;
+  const d = await fetchJson(`${rest}/cosmos/bank/v1beta1/balances/${addr}?pagination.limit=1000`);
+  const m = {}; for (const c of (d.balances || [])) m[c.denom] = c.amount; return m;
 }
 async function fetchOrderbook(marketId) {
-  const r = await fetch(`${NETS[net].indexer}/api/exchange/spot/v2/orderbook/${marketId}`);
-  if (!r.ok) throw new Error("orderbook fetch failed");
-  return (await r.json()).orderbook || { buys: [], sells: [] };
+  const d = await fetchJson(`${NETS[net].indexer}/api/exchange/spot/v2/orderbook/${marketId}`);
+  return d.orderbook || { buys: [], sells: [] };
+}
+// Balances failed at connect time — keep the session, retry quietly in the background.
+function scheduleBalanceRetry(n = 0) {
+  if (n >= 4 || !wallet) return;
+  setTimeout(async () => {
+    if (!wallet) return;
+    try { wallet.balances = await fetchBalances(NETS[net].rest, wallet.address); if (!$("status").classList.contains("ok")) setStatus(""); refresh(); }
+    catch (_) { scheduleBalanceRetry(n + 1); }
+  }, 2000 * (n + 1));
 }
 
 // Walk the book. INJ->USDC sells into bids; USDC->INJ buys from asks. Returns output base units.
@@ -529,7 +556,7 @@ async function connectWallet(id, opts = {}) {
       const key = await window.keplr.getKey(cfg.chainId);
       let balances = {};
       try { balances = await fetchBalances(cfg.rest, key.bech32Address); }
-      catch (_) { if (!silent) setStatus("Connected — couldn't load balances (RPC).", "err"); }
+      catch (_) { scheduleBalanceRetry(); }
       wallet = { type: "keplr", name: w.name, address: key.bech32Address, pubKey: key.pubKey, balances };
     } else {
       const provider = evmProviderFor(id);
@@ -542,7 +569,7 @@ async function connectWallet(id, opts = {}) {
       const inj = window.__NINJUCKS_TEST_INJADDR ? window.__NINJUCKS_TEST_INJADDR(eth) : (await import(SDK)).getInjectiveAddress(eth);
       let balances = {};
       try { balances = await fetchBalances(cfg.rest, inj); }
-      catch (_) { if (!silent) setStatus("Connected — couldn't load balances (RPC).", "err"); }
+      catch (_) { scheduleBalanceRetry(); }
       wallet = { type: "evm", name: w.name, address: inj, ethAddress: eth, provider, balances };
     }
     try { localStorage.setItem(WALLET_KEY, id); } catch (_) {}
@@ -738,6 +765,18 @@ $("wBack").addEventListener("click", closeWalletModal);
 $("termsChk").addEventListener("change", () => { $("termsOk").disabled = !$("termsChk").checked; });
 $("termsOk").addEventListener("click", acceptTerms);
 $("termsCancel").addEventListener("click", declineTerms);
+
+// Footer build stamp (written to /version.json at deploy time). Tap to toggle SHA ⇄ deploy date.
+fetch("version.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+  if (!v || !v.sha) return;
+  const el = $("build"), d = v.date ? new Date(v.date) : null;
+  const dateStr = d && !isNaN(d) ? d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "unknown";
+  let showDate = false;
+  const render = () => { el.textContent = showDate ? `deployed ${dateStr}` : v.sha; };
+  el.title = `Deployed ${dateStr}`;
+  el.addEventListener("click", () => { showDate = !showDate; render(); });
+  $("buildSep").hidden = false; el.hidden = false; render();
+}).catch(() => {});
 
 window.__ninjucks = { buildExecuteMsg, setNet, refresh, walkQuote, connect: connectWallet, openWalletModal, walletAvailable, get wallet() { return wallet; }, get quote() { return quote; }, setQuote(q) { quote = q; refresh(); } };
 </script>

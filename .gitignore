@@ -22,3 +22,6 @@ build/node_modules/
 
 # local deploy/test scripts — not published
 scripts/
+
+# generated at deploy time
+frontend/version.json
