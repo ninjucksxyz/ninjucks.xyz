@@ -28,11 +28,12 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const URL = `http://127.0.0.1:${server.address().port}/`;
 const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
 
-async function freshPage({ withKeplr = false, withHook = false, withEvm = false, acceptTerms = true, balances = { inj: "5000000000000000000" }, book = BOOK } = {}) {
+async function freshPage({ withKeplr = false, withHook = false, withEvm = false, acceptTerms = true, savedWallet = null, balances = { inj: "5000000000000000000" }, book = BOOK } = {}) {
   const page = await browser.newPage();
   await page.evaluateOnNewDocument((flags) => {
     window.__calls = [];
     try { if (flags.acceptTerms !== false) localStorage.setItem("ninjucks_terms_v1", "1"); else localStorage.removeItem("ninjucks_terms_v1"); } catch (e) {}
+    try { if (flags.savedWallet) localStorage.setItem("ninjucks_wallet", flags.savedWallet); else localStorage.removeItem("ninjucks_wallet"); } catch (e) {}
     if (flags.withKeplr) window.keplr = {
       enable: async () => {}, getKey: async () => ({ bech32Address: "inj1testxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", pubKey: new Uint8Array([1, 2, 3]) }),
       signDirect: async () => ({ signed: { bodyBytes: new Uint8Array(), authInfoBytes: new Uint8Array() }, signature: { signature: btoa("sig") } }),
@@ -53,7 +54,7 @@ async function freshPage({ withKeplr = false, withHook = false, withEvm = false,
       if (u.includes("/api/exchange/spot/v2/orderbook/")) return { ok: true, json: async () => ({ orderbook: flags.book }) };
       return _fetch(url, opt);
     };
-  }, { withKeplr, withHook, withEvm, acceptTerms, balances, book });
+  }, { withKeplr, withHook, withEvm, acceptTerms, savedWallet, balances, book });
   const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(URL, { waitUntil: "networkidle0" });
   page.__errors = errors;
@@ -253,6 +254,23 @@ try {
     const page = await freshPage({ withKeplr: true });
     await connect(page);
     ok("no terms modal when already accepted", await page.$eval("#termsModal", (e) => e.hidden));
+    await page.close();
+  }
+
+  // 17. Wallet persists across reload → silent auto-reconnect on load (no click).
+  {
+    const page = await freshPage({ withKeplr: true, savedWallet: "keplr" });
+    await page.waitForFunction(() => window.__ninjucks.wallet !== null, { timeout: 5000 });
+    const w = await page.evaluate(() => window.__ninjucks.wallet);
+    ok("auto-reconnects persisted wallet on load", w && w.type === "keplr", JSON.stringify(w));
+    ok("no terms modal on silent reconnect", await page.$eval("#termsModal", (e) => e.hidden));
+    await page.close();
+  }
+
+  // 18. No persisted wallet → stays disconnected on load.
+  {
+    const page = await freshPage({ withKeplr: true });
+    ok("no auto-connect without a saved wallet", (await page.evaluate(() => window.__ninjucks.wallet)) === null);
     await page.close();
   }
 } finally { await browser.close(); server.close(); }

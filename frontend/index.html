@@ -480,6 +480,7 @@ function setNet(n) {
   if (cfg.govUrl) $("govLink").href = cfg.govUrl;
   wallet = null; quote = null; setStatus("");
   refresh(); scheduleQuote();
+  autoReconnect();
 }
 
 // ---- Multi-wallet: Keplr (Cosmos-native) + MetaMask / Rabby / Brave (EVM, EIP-712) ----
@@ -511,37 +512,42 @@ function walletAvailable(id) {
   return WALLETS[id].kind === "cosmos" ? !!window.keplr : !!evmProviderFor(id);
 }
 
-async function connectWallet(id) {
+// `silent` = auto-reconnect on page load: no prompts (eth_accounts / Keplr getKey are silent),
+// no error surfaced, no terms modal — just restore the session if the wallet is still authorized.
+async function connectWallet(id, opts = {}) {
+  const silent = opts.silent === true;
   const cfg = NETS[net];
   const w = WALLETS[id];
   closeWalletModal();
   try {
     if (w.kind === "cosmos") {
-      if (!window.keplr) throw new Error("Keplr not found — install the Keplr extension.");
-      setStatus('<span class="spin"></span>Connecting Keplr…');
+      if (!window.keplr) { if (silent) return; throw new Error("Keplr not found — install the Keplr extension."); }
+      if (!silent) setStatus('<span class="spin"></span>Connecting Keplr…');
       await window.keplr.enable(cfg.chainId);
       const key = await window.keplr.getKey(cfg.chainId);
       let balances = {};
       try { balances = await fetchBalances(cfg.rest, key.bech32Address); }
-      catch (_) { setStatus("Connected — couldn't load balances (RPC).", "err"); }
+      catch (_) { if (!silent) setStatus("Connected — couldn't load balances (RPC).", "err"); }
       wallet = { type: "keplr", name: w.name, address: key.bech32Address, pubKey: key.pubKey, balances };
     } else {
       const provider = evmProviderFor(id);
-      if (!provider) throw new Error(`${w.name} not found — install the ${w.name} extension.`);
-      setStatus(`<span class="spin"></span>Connecting ${w.name}…`);
-      const accounts = await provider.request({ method: "eth_requestAccounts" });
+      if (!provider) { if (silent) return; throw new Error(`${w.name} not found — install the ${w.name} extension.`); }
+      if (!silent) setStatus(`<span class="spin"></span>Connecting ${w.name}…`);
+      const accounts = await provider.request({ method: silent ? "eth_accounts" : "eth_requestAccounts" });
+      if (!accounts || !accounts.length) { if (silent) return; throw new Error(`${w.name} has no connected account.`); }
       const eth = accounts[0];
       // EVM address maps to an Injective account (both ethsecp256k1).
       const inj = window.__NINJUCKS_TEST_INJADDR ? window.__NINJUCKS_TEST_INJADDR(eth) : (await import(SDK)).getInjectiveAddress(eth);
       let balances = {};
       try { balances = await fetchBalances(cfg.rest, inj); }
-      catch (_) { setStatus("Connected — couldn't load balances (RPC).", "err"); }
+      catch (_) { if (!silent) setStatus("Connected — couldn't load balances (RPC).", "err"); }
       wallet = { type: "evm", name: w.name, address: inj, ethAddress: eth, provider, balances };
     }
-    if (!$("status").classList.contains("err")) setStatus("");
-  } catch (e) { setStatus("⚠️ " + (e?.message || e), "err"); }
+    try { localStorage.setItem(WALLET_KEY, id); } catch (_) {}
+    if (!silent && !$("status").classList.contains("err")) setStatus("");
+  } catch (e) { if (!silent) setStatus("⚠️ " + (e?.message || e), "err"); }
   refresh();
-  if (wallet && !termsAccepted()) openTermsModal();
+  if (!silent && wallet && !termsAccepted()) openTermsModal();
 }
 
 // One-time legal-terms confirmation, shown right after a wallet connects.
@@ -550,7 +556,14 @@ function termsAccepted() { try { return localStorage.getItem(TERMS_KEY) === "1";
 function openTermsModal() { $("termsChk").checked = false; $("termsOk").disabled = true; $("termsModal").hidden = false; }
 function closeTermsModal() { $("termsModal").hidden = true; }
 function acceptTerms() { try { localStorage.setItem(TERMS_KEY, "1"); } catch (_) {} closeTermsModal(); refresh(); }
-function declineTerms() { closeTermsModal(); wallet = null; setStatus("Connect a wallet to swap."); refresh(); }
+function declineTerms() { closeTermsModal(); wallet = null; try { localStorage.removeItem(WALLET_KEY); } catch (_) {} setStatus("Connect a wallet to swap."); refresh(); }
+
+// Persist the connected wallet across reloads, and silently restore it on load / network switch.
+const WALLET_KEY = "ninjucks_wallet";
+function autoReconnect() {
+  let id = null; try { id = localStorage.getItem(WALLET_KEY); } catch (_) {}
+  if (id && WALLETS[id]) connectWallet(id, { silent: true });
+}
 
 function openWalletModal() {
   const list = $("wList"); list.innerHTML = "";
